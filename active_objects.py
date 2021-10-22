@@ -30,9 +30,10 @@ class ActiveObject:
                 self.t = t
                 self.controller.__tree_by_t__.add(self.__tree_by_t__)
 
-    def unschedule(self):
-        self.t = None
+    def deactivate(self):
         self.controller.__tree_by_t__.remove(self.__tree_by_t__)
+        self.t = None
+        self.__signaled__.remove()
 
     def signal(self):
         if not self.__signaled__.in_list():
@@ -113,27 +114,35 @@ class ActiveObjectsController:
             return node.owner
 
     def process(self, on_error=None) -> datetime:
+
+        def do(obj:ActiveObject):
+            if on_error is not None:
+                obj.process()
+            else:
+                try:
+                    obj.process()
+                except Exception as e:
+                    on_error(obj, e)
+
         while True:
             obj = self.get_nearest()
             next_time = None
             while obj is not None:
-                next_task = obj.next()
                 dt = (obj.get_t() - self.now()).total_seconds()
                 if dt > 0:
                     next_time = obj.get_t()
                     break
-                obj.unschedule()
-                obj.signal()
+                next_task = obj.next()
+                obj.deactivate()
+                do(obj)
                 obj = next_task
             item = self.__signaled__.remove_first()
             if item is None:
                 return next_time
-            while item is not None:
-                try:
-                    item.owner.process()
-                except Exception as e:
-                    if on_error is not None:
-                        on_error(item.owner, e)
+            n = 10
+            while n > 0 and item is not None:
+                do(item.owner)
+                n -= 1
                 item = self.__signaled__.remove_first()
 
     def for_each_object(self, type_name, func):
