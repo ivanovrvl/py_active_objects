@@ -73,7 +73,7 @@ class DualLinkedList:
         self.FFirst = None
         self.FLast = None
 
-    def remove(self, Item: DualLinkedListItem):
+    def remove(self, item: DualLinkedListItem):
         if item.__list__ is None: return
         if item.__next__ is None:
             if item.__prev__ is None:
@@ -90,9 +90,9 @@ class DualLinkedList:
                 item.__next__.__prev__ = item.__prev__
                 item.__prev__.__next__ = item.__next__
         self.count -= 1
-        item.__list__ = nil
-        item.__prev__ = nil
-        item.__next__ = nil
+        item.__list__ = None
+        item.__prev__ = None
+        item.__next__ = None
 
     def remove_first(self) -> DualLinkedListItem:
         Result = self.FFirst
