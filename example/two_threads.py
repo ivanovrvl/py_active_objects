@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath('..'))
 from active_objects import ActiveObjectsController, ActiveObjectWithRetries, simple_loop
 
 class TestAO(ActiveObjectWithRetries):
