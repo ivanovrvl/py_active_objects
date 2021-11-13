@@ -99,12 +99,15 @@ class ActiveObjectWithRetries(ActiveObject):
         self.min_retry_interval = 1
         self.max_retry_interval = 60
 
+    def was_error(self):
+        return self.__next_retry__ is not None
+
     def process_internal(self):
         try:
             if self.__next_retry__ is None \
             or self.reached(self.__next_retry__):
                 super().process_internal()
-                self.__next_retry_interval__ = None
+                self.__next_retry__ = None
         except:
             if self.__next_retry__ is None:
                 self.__next_retry_interval__ = self.min_retry_interval
