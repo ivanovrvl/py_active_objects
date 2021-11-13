@@ -156,6 +156,7 @@ class ActiveObjectsController():
         self.__tree_by_id__ = avl_tree.Tree(__comp_id__)
         self.__signaled__ = [linked_list.DualLinkedList() for i in range(0, priority_count)]
         self.terminated: bool = False
+        self.emulated_time = None
 
     def find(self, type_name, id) -> ActiveObject:
         node = self.__tree_by_id__.find((type_name,id), __compkey_id__)
@@ -163,7 +164,10 @@ class ActiveObjectsController():
             return node.owner
 
     def now(self) -> datetime:
-        return datetime.now()
+        if self.emulated_time is None:
+            return datetime.now()
+        else:
+            return self.emulated_time
 
     def get_nearest(self) -> ActiveObject:
         node = self.__tree_by_t__.get_leftmost()
@@ -248,10 +252,19 @@ def simple_loop(controller:ActiveObjectsController):
     import time
     while not controller.terminated:
         next_time = controller.process()
+        if controller.terminated: return
         if next_time is not None:
             delta = (next_time - controller.now()).total_seconds()
             if delta > 0:
                 time.sleep(delta)
 
+def emulate_asap(controller:ActiveObjectsController, start_time:datetime):
+    import time
+    controller.emulated_time = start_time
+    while not controller.terminated:
+        controller.emulated_time = controller.process()
+        if controller.terminated: return
+        if controller.emulated_time is None:
+            raise Exception('controller.emulated_time is None!')
 
 

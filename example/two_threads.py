@@ -1,7 +1,8 @@
 import sys
 import os
+import datetime
 sys.path.append(os.path.abspath('..'))
-from active_objects import ActiveObjectsController, ActiveObjectWithRetries, simple_loop
+from active_objects import ActiveObjectsController, ActiveObjectWithRetries, simple_loop, emulate_asap
 
 class TestAO(ActiveObjectWithRetries):
 
@@ -24,6 +25,7 @@ class TestAO(ActiveObjectWithRetries):
         elif self.reached(self.stop_time):
             self.controller.terminate()
             print(self.now(), 'stop')
+            return
 
         # each 3 seconds
         if self.reached(self.next1):
@@ -46,3 +48,4 @@ controller = ActiveObjectsController()
 ao = TestAO(controller)
 
 simple_loop(controller)
+#emulate_asap(controller, datetime.datetime(year=2000, month=1, day=1))
