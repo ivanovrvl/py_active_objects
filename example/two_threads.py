@@ -11,6 +11,7 @@ class TestAO(ActiveObjectWithRetries):
         self.stop_time = None
         self.next1 = None
         self.next2 = None
+        self.signal() # auto start
 
     def process(self):
 
@@ -22,6 +23,7 @@ class TestAO(ActiveObjectWithRetries):
             self.stop_time = self.schedule_seconds(60)
         elif self.reached(self.stop_time):
             self.controller.terminate()
+            print(self.now(), 'stop')
 
         # each 3 seconds
         if self.reached(self.next1):
@@ -38,10 +40,9 @@ class TestAO(ActiveObjectWithRetries):
             # continue on error (with retries)
             super().process_internal()
         except Exception as e:
-            print(self.now(),str(e))
+            print(self.now(), str(e))
 
 controller = ActiveObjectsController()
 ao = TestAO(controller)
-ao.signal()
 
 simple_loop(controller)
