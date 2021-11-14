@@ -250,6 +250,7 @@ class ActiveObjectsController():
 
 def simple_loop(controller:ActiveObjectsController):
     import time
+    controller.emulated_time = None
     while not controller.terminated:
         next_time = controller.process()
         if controller.terminated: return
@@ -259,7 +260,6 @@ def simple_loop(controller:ActiveObjectsController):
                 time.sleep(delta)
 
 def emulate_asap(controller:ActiveObjectsController, start_time:datetime):
-    import time
     controller.emulated_time = start_time
     while not controller.terminated:
         controller.emulated_time = controller.process()
