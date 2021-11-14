@@ -47,5 +47,5 @@ class TestAO(ActiveObjectWithRetries):
 controller = ActiveObjectsController()
 ao = TestAO(controller)
 
-simple_loop(controller)
-#emulate_asap(controller, datetime.datetime(year=2000, month=1, day=1))
+#simple_loop(controller)
+emulate_asap(controller, datetime.datetime(year=2000, month=1, day=1))
