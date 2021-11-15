@@ -10,10 +10,9 @@ class PrintAO(ActiveObject):
         super().__init__(controller)
         self.next1 = None
         self.n = 0
-        self.signal() # auto start
-        self.is_shutup = False
         self.sub = SignalSub(self, edge=True, pub=pub)
         self.id = id
+        self.signal() # auto start
 
     def process(self):
         if self.sub.reset():
@@ -42,7 +41,6 @@ class PublisherAO(ActiveObject):
             self.pub.signal() # Notify subscribers
             print(self.now(), 'signal')
             self.next1 = self.schedule_seconds(9.5)
-
 
 controller = ActiveObjectsController()
 publisher_ao = PublisherAO(controller)
