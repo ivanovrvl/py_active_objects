@@ -8,8 +8,6 @@ class PrintAO(ActiveObject):
 
     def __init__(self, controller, id, pub:SignalPub):
         super().__init__(controller)
-        self.next1 = None
-        self.n = 0
         self.sub = SignalSub(self, edge=True, pub=pub)
         self.id = id
         self.signal() # auto start
