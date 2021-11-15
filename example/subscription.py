@@ -14,6 +14,7 @@ class PrintAO(ActiveObject):
 
     def process(self):
         if self.sub.reset():
+            # do something if sub signal was set
             print(self.now(), self.id)
 
 class PublisherAO(ActiveObject):
@@ -36,9 +37,9 @@ class PublisherAO(ActiveObject):
             return
 
         if self.reached(self.next1):
-            self.pub.signal() # Notify subscribers
+            self.pub.signal() # Notify all subscribers by setting theirs sub signals
             print(self.now(), 'signal')
-            self.next1 = self.schedule_seconds(9.5)
+            self.next1 = self.schedule_seconds(10)
 
 controller = ActiveObjectsController()
 publisher_ao = PublisherAO(controller)
