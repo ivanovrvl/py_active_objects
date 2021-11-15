@@ -118,6 +118,62 @@ class ActiveObjectWithRetries(ActiveObject):
             self.__next_retry__ = self.schedule_delay(timedelta(seconds=self.__next_retry_interval__))
             raise
 
+class SignalPub:
+
+    def __init__(self, owner=None):
+        self.subscribers = linked_list.DualLinkedList()
+        self.owner = owner
+
+    def signal(self):
+        item = self.subscribers.first
+        while item is not None:
+            sub = item.owner
+            if not sub.edge or not sub.is_set:
+                sub.is_set = True
+                sub.owner.signal()
+            item = item.get_next()
+
+    def close(self):
+        item = self.subscribers.remove_first()
+        while item is not None:
+            sub = item.owner
+            if not sub.edge or not sub.is_set:
+                sub.is_set = True
+                sub.owner.signal()
+            item = self.subscribers.remove_first()
+
+
+class SignalSub:
+
+    def __init__(self, owner:ActiveObject, edge:bool=False, is_set=False, pub:SignalPub=None):
+        self.owner = owner
+        self.pub_link = linked_list.DualLinkedListItem(self)
+        self.is_set = is_set
+        self.edge = edge
+        if pub is not None: self.subscribe(pub)
+
+    def subscribe(self, pub:SignalPub):
+        pub.subscribers.add(self.pub_link)
+
+    def unsubscribe(self):
+        self.pub_link.remove()
+
+    def is_subscribed(self):
+        return self.pub_link.in_list()
+
+    def is_active(self):
+        if self.is_set: return True
+        if not self.pub_link.in_list(): return True
+        return False
+
+    def reset(self):
+        res = self.is_active()
+        self.is_set = False
+        return res
+
+    def close(self):
+        self.unsubscribe()
+
 def __compkey_id__(k, n):
     if k[0] > n.owner.type_name:
         return 1
