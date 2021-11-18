@@ -28,7 +28,7 @@ class DualLinkedList:
 
     def add(self, item: DualLinkedListItem):
         if item.__list__ is not None:
-            self.__list__.Remove(self)
+            item.__list__.remove(item)
         if self.first is None:
             self.first = item
             self.last = item
