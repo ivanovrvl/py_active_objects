@@ -178,8 +178,6 @@ class FlagState:
 
     def __init__(self, owner:ActiveObject):
         self.__wait_queue__ = linked_list.DualLinkedListItem(self)
-        self.__wait_up__: bool = False
-        self.__wait_down__: bool = False
         self.owner:ActiveObject = owner
 
     def close(self):
@@ -188,92 +186,54 @@ class FlagState:
 class Flag:
 
     def __init__(self):
-        self.__wait_queue__ = linked_list.DualLinkedList()
+        self.__wait_up_queue__ = linked_list.DualLinkedList()
+        self.__wait_down_queue__ = linked_list.DualLinkedList()
         self.__is_up__ = False
-        self.__has_waiting_up__ = False
-        self.__has_waiting_down__ = False
 
     def notify_all(self):
-        item:FlagState = self.__wait_queue__.first
-        if item is None: return
         if self.__is_up__:
+            item = self.__wait_up_queue__.remove_first()
             while item is not None:
-                if item.owner.__wait_up__:
-                    item.owner.__wait_up__ = False
-                    item.owner.owner.signal()
-                    if item.owner.__wait_down__:
-                        item = item.get_next()
-                    else:
-                        tmp = item.get_next()
-                        self.__wait_queue__.remove(item)
-                        item = tmp
-                else:
-                    item = item.get_next()
-            self.__has_waiting_up__ = False
+                item.owner.owner.signal()
+                item = self.__wait_up_queue__.remove_first()
         else:
+            item = self.__wait_down_queue__.remove_first()
             while item is not None:
-                if item.owner.__wait_down__:
-                    item.owner.__wait_down__ = False
-                    item.owner.owner.signal()
-                    if item.owner.__wait_up__:
-                        item = item.get_next()
-                    else:
-                        tmp = item.get_next()
-                        self.__wait_queue__.remove(item)
-                        item = tmp
-                else:
-                    item = item.get_next()
-            self.__has_waiting_down__ = False
+                item.owner.owner.signal()
+                item = self.__wait_down_queue__.remove_first()
 
     def notify(self) -> bool:
-        item:FlagState = self.__wait_queue__.first
-        if item is None: return False
         if self.__is_up__:
-            if self.__has_waiting_up__:
-                while item is not None:
-                    if item.owner.__wait_up__:
-                        item.owner.__wait_up__ = False
-                        item.owner.owner.signal()
-                        return True
-                    else:
-                        item = item.get_next()
-                self.__has_waiting_up__ = False
+            item = self.__wait_up_queue__.remove_first()
+            if item is None: return False
+            item.owner.owner.signal()
+            return True
         else:
-            if self.__has_waiting_down__:
-                while item is not None:
-                    if item.owner.__wait_down__:
-                        item.owner.__wait_down__ = False
-                        item.owner.owner.signal()
-                        return True
-                    else:
-                        item = item.get_next()
-                self.__has_waiting_down__ = False
-        return False
+            item = self.__wait_down_queue__.remove_first()
+            if item is None: return False
+            item.owner.owner.signal()
+            return True
 
     def is_up(self, state:FlagState) -> bool:
         if self.__is_up__:
-            state.__wait_up__ = False
-            if not state.__wait_down__:
-                state.__wait_queue__.remove()
+            if state.__wait_queue__.__list__ == self.__wait_up_queue__:
+                self.__wait_up_queue__.remove(state.__wait_queue__)
             return True
         else:
-            if not state.__wait_queue__.in_list():
-                self.__wait_queue__.add(state.__wait_queue__)
-            state.__wait_up__ = True
-            self.__has_waiting_up__ = True
+            if state.__wait_queue__.__list__ is None \
+            or state.__wait_queue__.__list__ != self.__wait_up_queue__:
+                self.__wait_up_queue__.add(state.__wait_queue__)
             return False
 
     def is_down(self, state:FlagState) -> bool:
         if not self.__is_up__:
-            state.__wait_down__ = False
-            if not state.__wait_up__:
-                state.__wait_queue__.remove()
+            if state.__wait_queue__.__list__ == self.__wait_down_queue__:
+                self.__wait_down_queue__.remove(state.__wait_queue__)
             return True
         else:
-            if not state.__wait_queue__.in_list():
-                self.__wait_queue__.add(state.__wait_queue__)
-            state.__wait_down__ = True
-            self.__has_waiting_down__ = True
+            if state.__wait_queue__.__list__ is None \
+            or state.__wait_queue__.__list__ != self.__wait_down_queue__:
+                self.__wait_down_queue__.add(state.__wait_queue__)
             return False
 
     def up(self, notify_all:bool=True):
