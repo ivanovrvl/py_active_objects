@@ -216,23 +216,23 @@ class Flag:
 
     def is_up(self, state:FlagState) -> bool:
         if self.__is_up__:
-            if state.__wait_queue__.__list__ == self.__wait_up_queue__:
+            if state.__wait_queue__.__list__ is self.__wait_up_queue__:
                 self.__wait_up_queue__.remove(state.__wait_queue__)
             return True
         else:
             if state.__wait_queue__.__list__ is None \
-            or state.__wait_queue__.__list__ != self.__wait_up_queue__:
+            or state.__wait_queue__.__list__ is not self.__wait_up_queue__:
                 self.__wait_up_queue__.add(state.__wait_queue__)
             return False
 
     def is_down(self, state:FlagState) -> bool:
         if not self.__is_up__:
-            if state.__wait_queue__.__list__ == self.__wait_down_queue__:
+            if state.__wait_queue__.__list__ is self.__wait_down_queue__:
                 self.__wait_down_queue__.remove(state.__wait_queue__)
             return True
         else:
             if state.__wait_queue__.__list__ is None \
-            or state.__wait_queue__.__list__ != self.__wait_down_queue__:
+            or state.__wait_queue__.__list__ is not self.__wait_down_queue__:
                 self.__wait_down_queue__.add(state.__wait_queue__)
             return False
 
