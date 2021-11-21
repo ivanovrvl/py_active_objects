@@ -174,6 +174,81 @@ class SignalSub:
     def close(self):
         self.unsubscribe()
 
+class FlagState:
+
+    def __init__(self, owner:ActiveObject):
+        self.__wait_queue__ = linked_list.DualLinkedListItem(self)
+        self.__wait_up__: bool = False
+        self.__wait_down__: bool = False
+        self.owner:ActiveObject = owner
+
+    def close(self):
+        self.__wait_queue__.remove()
+
+class Flag:
+
+    def __init__(self):
+        self.__wait_queue__ = linked_list.DualLinkedList()
+        self.__is_up__ = False
+
+    def is_up(self, state:FlagState) -> bool:
+        if self.__is_up__:
+            state.__wait_up__ = False
+            if not state.__wait_down__:
+                state.__wait_queue__.remove()
+            return True
+        else:
+            if not state.__wait_queue__.in_list():
+                self.__wait_queue__.add(state.__wait_queue__)
+            state.__wait_up__ = True
+            return False
+
+    def is_down(self, state:FlagState) -> bool:
+        if not self.__is_up__:
+            state.__wait_down__ = False
+            if not state.__wait_up__:
+                state.__wait_queue__.remove()
+            return True
+        else:
+            if not state.__wait_queue__.in_list():
+                self.__wait_queue__.add(state.__wait_queue__)
+            state.__wait_down__ = True
+            return False
+
+    def up(self):
+        if self.__is_up__: return
+        self.__is_up__ = True
+        item:FlagState = self.__wait_queue__.first
+        while item is not None:
+            if item.owner.__wait_up__:
+                item.owner.__wait_up__ = False
+                item.owner.owner.signal()
+                if item.owner.__wait_down__:
+                    item = item.get_next()
+                else:
+                    tmp = item.get_next()
+                    self.__wait_queue__.remove(item)
+                    item = tmp
+            else:
+                item = item.get_next()
+
+    def down(self):
+        if not self.__is_up__: return
+        self.__is_up__ = False
+        item:FlagState = self.__wait_queue__.first
+        while item is not None:
+            if item.owner.__wait_down__:
+                item.owner.__wait_down__ = False
+                item.owner.owner.signal()
+                if item.owner.__wait_up__:
+                    item = item.get_next()
+                else:
+                    tmp = item.get_next()
+                    self.__wait_queue__.remove(item)
+                    item = tmp
+            else:
+                item = item.get_next()
+
 def __compkey_id__(k, n):
     if k[0] > n.owner.type_name:
         return 1
