@@ -207,12 +207,12 @@ class Flag:
             item = self.__wait_up_queue__.remove_first()
             if item is None: return False
             item.owner.owner.signal()
-            return True
+            return self.__wait_up_queue__.first is not None
         else:
             item = self.__wait_down_queue__.remove_first()
             if item is None: return False
             item.owner.owner.signal()
-            return True
+            return self.__wait_down_queue__.first is not None
 
     def is_up(self, state:FlagState) -> bool:
         if self.__is_up__:
