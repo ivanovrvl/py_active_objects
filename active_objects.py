@@ -131,7 +131,7 @@ class SignalPub:
             if not sub.edge or not sub.is_set:
                 sub.is_set = True
                 sub.owner.signal()
-            item = item.get_next()
+            item = item.next
 
     def close(self):
         item = self.subscribers.remove_first()
@@ -216,23 +216,23 @@ class Flag:
 
     def is_up(self, state:FlagState) -> bool:
         if self.__is_up__:
-            if state.__wait_queue__.__list__ is self.__wait_up_queue__:
+            if state.__wait_queue__.list is self.__wait_up_queue__:
                 self.__wait_up_queue__.remove(state.__wait_queue__)
             return True
         else:
-            if state.__wait_queue__.__list__ is None \
-            or state.__wait_queue__.__list__ is not self.__wait_up_queue__:
+            if state.__wait_queue__.list is None \
+            or state.__wait_queue__.list is not self.__wait_up_queue__:
                 self.__wait_up_queue__.add(state.__wait_queue__)
             return False
 
     def is_down(self, state:FlagState) -> bool:
         if not self.__is_up__:
-            if state.__wait_queue__.__list__ is self.__wait_down_queue__:
+            if state.__wait_queue__.list is self.__wait_down_queue__:
                 self.__wait_down_queue__.remove(state.__wait_queue__)
             return True
         else:
-            if state.__wait_queue__.__list__ is None \
-            or state.__wait_queue__.__list__ is not self.__wait_down_queue__:
+            if state.__wait_queue__.list is None \
+            or state.__wait_queue__.list is not self.__wait_down_queue__:
                 self.__wait_down_queue__.add(state.__wait_queue__)
             return False
 

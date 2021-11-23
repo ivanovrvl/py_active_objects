@@ -16,7 +16,6 @@ class PrintAO(ActiveObject):
         self.signal() # auto start
 
     def process(self):
-
         if self.reached(self.next_print):
             if can_print.is_up(self.flag):
                 print(self.now(), self.id)
