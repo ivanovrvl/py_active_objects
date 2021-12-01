@@ -174,15 +174,6 @@ class SignalSub:
     def close(self):
         self.unsubscribe()
 
-class FlagState:
-
-    def __init__(self, owner:ActiveObject):
-        self.__wait_queue__ = linked_list.DualLinkedListItem(self)
-        self.owner:ActiveObject = owner
-
-    def close(self):
-        self.__wait_queue__.remove()
-
 class Flag:
 
     def __init__(self):
@@ -214,28 +205,6 @@ class Flag:
             item.owner.owner.signal()
             return self.__wait_down_queue__.first is not None
 
-    def is_up(self, state:FlagState) -> bool:
-        if self.__is_up__:
-            if state.__wait_queue__.list is self.__wait_up_queue__:
-                self.__wait_up_queue__.remove(state.__wait_queue__)
-            return True
-        else:
-            if state.__wait_queue__.list is None \
-            or state.__wait_queue__.list is not self.__wait_up_queue__:
-                self.__wait_up_queue__.add(state.__wait_queue__)
-            return False
-
-    def is_down(self, state:FlagState) -> bool:
-        if not self.__is_up__:
-            if state.__wait_queue__.list is self.__wait_down_queue__:
-                self.__wait_down_queue__.remove(state.__wait_queue__)
-            return True
-        else:
-            if state.__wait_queue__.list is None \
-            or state.__wait_queue__.list is not self.__wait_down_queue__:
-                self.__wait_down_queue__.add(state.__wait_queue__)
-            return False
-
     def up(self, notify_all:bool=True):
         if self.__is_up__: return False
         self.__is_up__ = True
@@ -247,6 +216,39 @@ class Flag:
         self.__is_up__ = False
         if notify_all:
             self.notify_all()
+
+class FlagListener:
+
+    def __init__(self, owner:ActiveObject):
+        self.__wait_queue__ = linked_list.DualLinkedListItem(self)
+        self.owner:ActiveObject = owner
+
+    def close(self):
+        self.__wait_queue__.remove()
+        self.owner:ActiveObject = None
+        self.flag:Flag = None
+
+    def is_up(self, flag: Flag) -> bool:
+        if flag.__is_up__:
+            if self.__wait_queue__.list is flag.__wait_up_queue__:
+                flag.__wait_up_queue__.remove(self.__wait_queue__)
+            return True
+        else:
+            if self.__wait_queue__.list is None \
+            or self.__wait_queue__.list is not flag.__wait_up_queue__:
+                flag.__wait_up_queue__.add(self.__wait_queue__)
+            return False
+
+    def is_down(self, flag: Flag) -> bool:
+        if not flag.__is_up__:
+            if self.__wait_queue__.list is flag.__wait_down_queue__:
+                flag.__wait_down_queue__.remove(self.__wait_queue__)
+            return True
+        else:
+            if self.__wait_queue__.list is None \
+            or self.__wait_queue__.list is not flag.__wait_down_queue__:
+                flag.__wait_down_queue__.add(self.__wait_queue__)
+            return False
 
 def __compkey_id__(k, n):
     if k[0] > n.owner.type_name:

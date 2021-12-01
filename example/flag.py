@@ -2,7 +2,7 @@ import sys
 import os
 import datetime
 sys.path.append(os.path.abspath('..'))
-from active_objects import ActiveObjectsController, ActiveObject, simple_loop, emulate_asap, SignalPub, SignalSub, Flag, FlagState
+from active_objects import ActiveObjectsController, ActiveObject, simple_loop, emulate_asap, SignalPub, SignalSub, Flag, FlagListener
 
 can_print = Flag()
 
@@ -11,16 +11,16 @@ class PrintAO(ActiveObject):
     def __init__(self, controller, id, pub:SignalPub):
         super().__init__(controller)
         self.next_print = None
-        self.flag = FlagState(self)
+        self.flag = FlagListener(self)
         self.id = id
         self.signal() # auto start
 
     def process(self):
 
         if self.reached(self.next_print):
-            if can_print.is_up(self.flag):
+            if self.flag.is_up(can_print):
                 print(self.now(), self.id)
-                can_print.down()
+                can_print.down(can_print)
                 self.next_print = self.schedule_seconds(5)
 
 class PublisherAO(ActiveObject):
