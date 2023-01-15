@@ -42,32 +42,42 @@ class Strike(ActiveObjectWithRetries):
             self.close()
         return self.live_ref
 
+    def __refresh_sub__(self):
+        # ставит на подписку/отписку
+        if self.sub_ref > 0:
+            # должен быть подписан
+            if not self.__is_sub__ and self.sub_link.list != sub_queue:
+                sub_queue.add(self.sub_link) # если фактически не подписан и не в очереди на пописку, то ставим в нее
+                sub_queue_add_event.signalAll()
+        else:
+            if self.__is_sub__ and self.sub_link.list != nosub_queue:
+                nosub_queue.add(self.sub_link) # если фактически  подписан и не в очереди на отписку, то ставим в нее
+                nosub_queue_add_event.signalAll()
+
     def set_is_sub(self, val:bool):
         if self.__is_sub__ == val:
             return
         # в течение фактической подписки удерживаем страйк от удаления
+        self.__is_sub__ = val
         if val:
             self.add_live_ref()
+            self.__refresh_sub__()
         else:
-            self.release_live_ref()
-        self.__is_sub__ = val
+            if self.release_live_ref() != 0:
+                self.__refresh_sub__()
 
     def add_sub_ref(self):
         if self.sub_ref == 0:
             self.add_live_ref() # удерживаем страйк от удаления, раз есть подписка
         self.sub_ref += 1
-        if not self.__is_sub__ and self.sub_link.list != sub_queue:
-            sub_queue.add(self.sub_link) # если фактически не подписан и не в очереди на пописку, то ставим в нее
-            sub_queue_add_event.signalAll()
+        self.__refresh_sub__()
         return self.sub_ref
 
     def release_sub_ref(self):
         self.sub_ref -= 1
         if self.sub_ref == 0:
-            self.release_live_ref()
-            if self.__is_sub__ and self.sub_link.list != nosub_queue:
-                nosub_queue.add(self.sub_link) # если фактически  подписан и не в очереди на отписку, то ставим в нее
-                nosub_queue_add_event.signalAll()
+            if self.release_live_ref() != 0:
+                self.__refresh_sub__()
         return self.sub_ref
 
     def process(self):
