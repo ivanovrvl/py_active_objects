@@ -118,61 +118,51 @@ class ActiveObjectWithRetries(ActiveObject):
             self.__next_retry__ = self.schedule_delay(timedelta(seconds=self.__next_retry_interval__))
             raise
 
-class SignalPub:
+class Signaler:
 
-    def __init__(self, owner=None):
+    def __init__(self):
         self.subscribers = linked_list.DualLinkedList()
-        self.owner = owner
 
-    def signal(self):
-        item = self.subscribers.first
-        while item is not None:
-            sub = item.owner
-            if not sub.edge or not sub.is_set:
-                sub.is_set = True
-                sub.owner.signal()
-            item = item.next
-
-    def close(self):
+    def signalAll(self):
         item = self.subscribers.remove_first()
         while item is not None:
-            sub = item.owner
-            if not sub.edge or not sub.is_set:
-                sub.is_set = True
-                sub.owner.signal()
+            ao = item.owner
+            ao.owner.signal()
             item = self.subscribers.remove_first()
 
-
-class SignalSub:
-
-    def __init__(self, owner:ActiveObject, edge:bool=False, is_set=False, pub:SignalPub=None):
-        self.owner = owner
-        self.pub_link = linked_list.DualLinkedListItem(self)
-        self.is_set = is_set
-        self.edge = edge
-        if pub is not None: self.subscribe(pub)
-
-    def subscribe(self, pub:SignalPub):
-        pub.subscribers.add(self.pub_link)
-
-    def unsubscribe(self):
-        self.pub_link.remove()
-
-    def is_subscribed(self):
-        return self.pub_link.in_list()
-
-    def is_active(self):
-        if self.is_set: return True
-        if not self.pub_link.in_list(): return True
-        return False
-
-    def reset(self):
-        res = self.is_active()
-        self.is_set = False
-        return res
+    def signalNext(self) -> bool:
+        item = self.subscribers.remove_first()
+        if item is None:
+            return False
+        ao = item.owner
+        ao.owner.signal()
+        return item.next is not None
 
     def close(self):
-        self.unsubscribe()
+        self.subscribers.clear()
+
+class Listener:
+
+    def __init__(self, owner:ActiveObject):
+        self.owner = owner
+        self.link = linked_list.DualLinkedListItem(self)
+
+    def is_signaled(self) -> bool:
+        return not self.link.in_list()
+
+    def wait(self, signaler: Signaler):
+        if self.link.list != signaler.subscribers:
+            signaler.subscribers.add(self.link)
+
+    def check(self, signaler: Signaler) -> bool:
+        if self.link.list == signaler.subscribers:
+            return False
+        else:
+            signaler.subscribers.add(self.link)
+            return True
+
+    def close(self):
+        self.link.remove()
 
 class Flag:
 
@@ -306,7 +296,7 @@ class ActiveObjectsController():
         if node is not None:
             return node.owner
 
-    def process(self, on_before=None, on_success=None, on_error=None) -> datetime:
+    def process(self, max_count: int=None, on_before=None, on_success=None, on_error=None) -> datetime:
 
         def do(obj:ActiveObject):
             obj.unschedule()
@@ -352,22 +342,40 @@ class ActiveObjectsController():
                 do(item.owner)
                 n -= 1
                 if n < 0: break
+                if max_count is not None:
+                    max_count -= 1
+                    if max_count <= 0:
+                        return None
                 if self.terminated: break
                 item = remove_next_signaled()
 
     def for_each_object(self, type_name, func):
-        n = self.__tree_by_id__.find_leftmost_eq(type_name, __compkey_type__)
-        while n is not None and n.owner.type_name == type_name:
-            func(n.owner)
-            n = n.get_successor()
+        if type_name is None:
+            n = self.__tree_by_id__.get_leftmost()
+            while n is not None:
+                func(n.owner)
+                n = n.get_successor()
+        else:
+            n = self.__tree_by_id__.find_leftmost_eq(type_name, __compkey_type__)
+            while n is not None and n.owner.type_name == type_name:
+                func(n.owner)
+                n = n.get_successor()
 
     def for_each_object_with_break(self, type_name, func):
-        n = self.__tree_by_id__.find_leftmost_eq(type_name, __compkey_type__)
-        while n is not None and n.owner.type_name == type_name:
-            v = func(n.owner)
-            if v:
-                return v
-            n = n.get_successor()
+        if type_name is None:
+            n = self.__tree_by_id__.get_leftmost()
+            while n is not None:
+                v = func(n.owner)
+                if v:
+                    return v
+                n = n.get_successor()
+        else:
+            n = self.__tree_by_id__.find_leftmost_eq(type_name, __compkey_type__)
+            while n is not None and n.owner.type_name == type_name:
+                v = func(n.owner)
+                if v:
+                    return v
+                n = n.get_successor()
         return None
 
     def get_ids(self, type_name) -> list:
@@ -375,7 +383,7 @@ class ActiveObjectsController():
         self.for_each_object(type_name, lambda o: res.append(o.id))
         return res
 
-    def signal(self, type_name):
+    def signal(self, type_name=None):
         self.for_each_object(type_name, lambda o: o.signal())
 
     def terminate(self):
