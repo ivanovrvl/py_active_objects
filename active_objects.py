@@ -94,28 +94,28 @@ class ActiveObjectWithRetries(ActiveObject):
 
     def __init__(self, controller, type_name=None, id=None, priority:int=0):
         super().__init__(controller, type_name, id, priority)
-        self.__next_retry__ = None
-        self.__next_retry_interval__ = None
+        self.__next_retry = None
+        self.__next_retry_interval = None
         self.min_retry_interval = 1
         self.max_retry_interval = 60
 
     def was_error(self):
-        return self.__next_retry__ is not None
+        return self.__next_retry is not None
 
     def process_internal(self):
         try:
-            if self.__next_retry__ is None \
-            or self.reached(self.__next_retry__):
+            if self.__next_retry is None \
+            or self.reached(self.__next_retry):
                 super().process_internal()
-                self.__next_retry__ = None
+                self.__next_retry = None
         except:
-            if self.__next_retry__ is None:
-                self.__next_retry_interval__ = self.min_retry_interval
+            if self.__next_retry is None:
+                self.__next_retry_interval = self.min_retry_interval
             else:
-                self.__next_retry_interval__ = self.__next_retry_interval__ + self.__next_retry_interval__
-                if self.__next_retry_interval__ > self.max_retry_interval:
-                    self.__next_retry_interval__ = self.max_retry_interval
-            self.__next_retry__ = self.schedule_delay(timedelta(seconds=self.__next_retry_interval__))
+                self.__next_retry_interval = self.__next_retry_interval + self.__next_retry_interval
+                if self.__next_retry_interval > self.max_retry_interval:
+                    self.__next_retry_interval = self.max_retry_interval
+            self.__next_retry = self.schedule_delay(timedelta(seconds=self.__next_retry_interval))
             raise
 
 class Signaler:
@@ -259,80 +259,80 @@ class SignalSub:
 class Flag:
 
     def __init__(self):
-        self.__wait_up_queue__ = linked_list.DualLinkedList()
-        self.__wait_down_queue__ = linked_list.DualLinkedList()
-        self.__is_up__ = False
+        self._wait_up_queue = linked_list.DualLinkedList()
+        self._wait_down_queue = linked_list.DualLinkedList()
+        self.__is_up = False
 
     def notify_all(self):
-        if self.__is_up__:
-            item = self.__wait_up_queue__.remove_first()
+        if self.__is_up:
+            item = self._wait_up_queue.remove_first()
             while item is not None:
                 item.owner.owner.signal()
-                item = self.__wait_up_queue__.remove_first()
+                item = self._wait_up_queue.remove_first()
         else:
-            item = self.__wait_down_queue__.remove_first()
+            item = self._wait_down_queue.remove_first()
             while item is not None:
                 item.owner.owner.signal()
-                item = self.__wait_down_queue__.remove_first()
+                item = self._wait_down_queue.remove_first()
 
     def notify(self) -> bool:
-        if self.__is_up__:
-            item = self.__wait_up_queue__.remove_first()
+        if self.__is_up:
+            item = self._wait_up_queue.remove_first()
             if item is None: return False
             item.owner.owner.signal()
-            return self.__wait_up_queue__.first is not None
+            return self._wait_up_queue.first is not None
         else:
-            item = self.__wait_down_queue__.remove_first()
+            item = self._wait_down_queue.remove_first()
             if item is None: return False
             item.owner.owner.signal()
-            return self.__wait_down_queue__.first is not None
+            return self._wait_down_queue.first is not None
 
     def up(self, notify_all:bool=True):
-        if self.__is_up__: return False
-        self.__is_up__ = True
+        if self.__is_up: return False
+        self.__is_up = True
         if notify_all:
             self.notify_all()
 
     def down(self, notify_all:bool=True):
-        if not self.__is_up__: return False
-        self.__is_up__ = False
+        if not self.__is_up: return False
+        self.__is_up = False
         if notify_all:
             self.notify_all()
 
 class FlagListener:
 
     def __init__(self, owner:ActiveObject):
-        self.__wait_queue__ = linked_list.DualLinkedListItem(self)
+        self._wait_queue = linked_list.DualLinkedListItem(self)
         self.owner:ActiveObject = owner
 
     def close(self):
-        self.__wait_queue__.remove()
+        self._wait_queue.remove()
         self.owner:ActiveObject = None
         self.flag:Flag = None
 
     def is_up(self, flag: Flag) -> bool:
-        if flag.__is_up__:
-            if self.__wait_queue__.list is flag.__wait_up_queue__:
-                flag.__wait_up_queue__.remove(self.__wait_queue__)
+        if flag.__is_up:
+            if self._wait_queue.list is flag._wait_up_queue:
+                flag._wait_up_queue.remove(self._wait_queue)
             return True
         else:
-            if self.__wait_queue__.list is None \
-            or self.__wait_queue__.list is not flag.__wait_up_queue__:
-                flag.__wait_up_queue__.add(self.__wait_queue__)
+            if self._wait_queue.list is None \
+            or self._wait_queue.list is not flag._wait_up_queue:
+                flag._wait_up_queue.add(self._wait_queue)
             return False
 
     def is_down(self, flag: Flag) -> bool:
-        if not flag.__is_up__:
-            if self.__wait_queue__.list is flag.__wait_down_queue__:
-                flag.__wait_down_queue__.remove(self.__wait_queue__)
+        if not flag.__is_up:
+            if self._wait_queue.list is flag._wait_down_queue:
+                flag._wait_down_queue.remove(self._wait_queue)
             return True
         else:
-            if self.__wait_queue__.list is None \
-            or self.__wait_queue__.list is not flag.__wait_down_queue__:
-                flag.__wait_down_queue__.add(self.__wait_queue__)
+            if self._wait_queue.list is None \
+            or self._wait_queue.list is not flag._wait_down_queue:
+                flag._wait_down_queue.add(self._wait_queue)
             return False
 
-def __compkey_id__(k, n):
+def _compkey_id(k, n):
     if k[0] > n.owner.type_name:
         return 1
     elif k[0] < n.owner.type_name:
@@ -344,7 +344,7 @@ def __compkey_id__(k, n):
     else:
         return -1
 
-def __compkey_type__(k, n):
+def _compkey_type(k, n):
     if k > n.owner.type_name:
         return 1
     elif k < n.owner.type_name:
@@ -352,10 +352,10 @@ def __compkey_type__(k, n):
     else:
         return 0
 
-def __comp_id__(n1, n2):
-    return __compkey_id__((n1.owner.type_name, n1.owner.id), n2)
+def _comp_id(n1, n2):
+    return _compkey_id((n1.owner.type_name, n1.owner.id), n2)
 
-def __comp_t__(n1, n2):
+def _comp_t(n1, n2):
     if n1.owner.t > n2.owner.t:
         return 1
     elif n1.owner.t == n2.owner.t:
@@ -366,14 +366,14 @@ def __comp_t__(n1, n2):
 class ActiveObjectsController():
 
     def __init__(self, priority_count:int=1):
-        self._tree_by_t = avl_tree.Tree(__comp_t__)
-        self._tree_by_id = avl_tree.Tree(__comp_id__)
+        self._tree_by_t = avl_tree.Tree(_comp_t)
+        self._tree_by_id = avl_tree.Tree(_comp_id)
         self._signaled = [linked_list.DualLinkedList() for i in range(0, priority_count)]
         self.terminated: bool = False
         self.emulated_time = None
 
     def find(self, type_name, id) -> ActiveObject:
-        node = self._tree_by_id.find((type_name,id), __compkey_id__)
+        node = self._tree_by_id.find((type_name,id), _compkey_id)
         if node is not None:
             return node.owner
 
@@ -448,7 +448,7 @@ class ActiveObjectsController():
                 func(n.owner)
                 n = n.get_successor()
         else:
-            n = self._tree_by_id.find_leftmost_eq(type_name, __compkey_type__)
+            n = self._tree_by_id.find_leftmost_eq(type_name, _compkey_type)
             while n is not None and n.owner.type_name == type_name:
                 func(n.owner)
                 n = n.get_successor()
@@ -462,7 +462,7 @@ class ActiveObjectsController():
                     return v
                 n = n.get_successor()
         else:
-            n = self._tree_by_id.find_leftmost_eq(type_name, __compkey_type__)
+            n = self._tree_by_id.find_leftmost_eq(type_name, _compkey_type)
             while n is not None and n.owner.type_name == type_name:
                 v = func(n.owner)
                 if v:
