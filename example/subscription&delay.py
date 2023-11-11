@@ -2,7 +2,7 @@ import sys
 import os
 import datetime
 sys.path.append(os.path.abspath('..'))
-from active_objects import ActiveObjectsController, ActiveObject, simple_loop, emulate_asap, Signaler, Listener
+from active_objects import ActiveObjectsController, ActiveObject, simple_loop, emulate_asap, Signaler, Listener, AOListener
 
 next_print: datetime.datetime = None # global lock to delay printing
 
@@ -39,7 +39,7 @@ class PrintAO(ActiveObject):
     def __init__(self, controller, id, pub:PublisherAO):
         super().__init__(controller)
         self.pub = pub
-        self.listen = Listener(self)
+        self.listen = AOListener(self)
         self.listen.wait(self.pub.event)
         self.id = id
         self.signal() # auto start
@@ -64,5 +64,5 @@ print_ao1 = PrintAO(controller, 1, publisher_ao)
 print_ao2 = PrintAO(controller, 2, publisher_ao)
 print_ao2 = PrintAO(controller, 3, publisher_ao)
 
-simple_loop(controller)
-#emulate_asap(controller, datetime.datetime(year=2000, month=1, day=1))
+#simple_loop(controller)
+emulate_asap(controller, datetime.datetime(year=2000, month=1, day=1))

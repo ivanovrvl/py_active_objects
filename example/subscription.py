@@ -2,7 +2,7 @@ import sys
 import os
 import datetime
 sys.path.append(os.path.abspath('..'))
-from active_objects import ActiveObjectsController, ActiveObject, simple_loop, emulate_asap, Signaler, Listener
+from active_objects import ActiveObjectsController, ActiveObject, simple_loop, emulate_asap, Signaler, AOListener
 
 class PublisherAO(ActiveObject):
 
@@ -37,7 +37,7 @@ class PrintAO(ActiveObject):
     def __init__(self, controller, id, event: Signaler):
         super().__init__(controller)
         self.event = event
-        self.listen = Listener(self)
+        self.listen = AOListener(self)
         self.listen.wait(self.event)
         self.id = id
         self.signal() # auto start

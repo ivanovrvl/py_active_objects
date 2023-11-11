@@ -11,12 +11,12 @@ class ActiveObject:
         self.type_name = type_name
         self.id = id
         self.controller = controller
-        self.__tree_by_t__ = avl_tree.TreeNode(self)
-        self.__tree_by_id__ = avl_tree.TreeNode(self)
-        self.__signaled__ = linked_list.DualLinkedListItem(self)
+        self._tree_by_t = avl_tree.TreeNode(self)
+        self._tree_by_id = avl_tree.TreeNode(self)
+        self._signaled = linked_list.DualLinkedListItem(self)
         self.priority = priority
         if id is not None:
-            controller.__tree_by_id__.add(self.__tree_by_id__)
+            controller._tree_by_id.add(self._tree_by_id)
 
     def process(self):
         pass
@@ -25,17 +25,17 @@ class ActiveObject:
         self.process()
 
     def is_signaled(self) -> bool:
-        return self.__signaled__.in_list()
+        return self._signaled.in_list()
 
     def is_scheduled(self) -> bool:
-        return self.__tree_by_t__.in_tree()
+        return self._tree_by_t.in_tree()
 
     def schedule(self, t:datetime):
         if t is not None:
-            if not self.__tree_by_t__.in_tree() or t < self.t:
-                self.controller.__tree_by_t__.remove(self.__tree_by_t__)
+            if not self._tree_by_t.in_tree() or t < self.t:
+                self.controller._tree_by_t.remove(self._tree_by_t)
                 self.t = t
-                self.controller.__tree_by_t__.add(self.__tree_by_t__)
+                self.controller._tree_by_t.add(self._tree_by_t)
 
     def schedule_delay(self, delay:timedelta):
         t = self.controller.now() + delay
@@ -52,17 +52,17 @@ class ActiveObject:
         return self.schedule_delay(timedelta(minutes==delay))
 
     def unschedule(self):
-        self.controller.__tree_by_t__.remove(self.__tree_by_t__)
+        self.controller._tree_by_t.remove(self._tree_by_t)
         self.t = None
 
     def deactivate(self):
-        self.controller.__tree_by_t__.remove(self.__tree_by_t__)
+        self.controller._tree_by_t.remove(self._tree_by_t)
         self.t = None
-        self.__signaled__.remove()
+        self._signaled.remove()
 
     def signal(self):
-        if not self.__signaled__.in_list():
-            self.controller.__signaled__[self.priority].add(self.__signaled__)
+        if not self._signaled.in_list():
+            self.controller._signaled[self.priority].add(self._signaled)
 
     def reached(self, t:datetime) -> bool:
         if t is None:
@@ -78,7 +78,7 @@ class ActiveObject:
         return self.t
 
     def next(self):
-        t = self.__tree_by_t__.get_successor()
+        t = self._tree_by_t.get_successor()
         if t is not None:
             return t.owner
 
@@ -86,9 +86,9 @@ class ActiveObject:
         return self.controller.now()
 
     def close(self):
-        self.controller.__tree_by_t__.remove(self.__tree_by_t__)
-        self.controller.__tree_by_id__.remove(self.__tree_by_id__)
-        self.__signaled__.remove()
+        self.controller._tree_by_t.remove(self._tree_by_t)
+        self.controller._tree_by_id.remove(self._tree_by_id)
+        self._signaled.remove()
 
 class ActiveObjectWithRetries(ActiveObject):
 
@@ -119,50 +119,142 @@ class ActiveObjectWithRetries(ActiveObject):
             raise
 
 class Signaler:
+    pass
+
+class Listener:
+    pass
+
+class Signaler:
 
     def __init__(self):
-        self.subscribers = linked_list.DualLinkedList()
+        self.queue = linked_list.DualLinkedList()
+
+    def signalNext(self)->bool:
+        item = self.queue.remove_first()
+        if item is None: return False
+        item.owner.signal()
+        return self.queue.first is not None
 
     def signalAll(self):
-        item = self.subscribers.remove_first()
+        item = self.queue.remove_first()
         while item is not None:
-            ao = item.owner
-            ao.owner.signal()
-            item = self.subscribers.remove_first()
-
-    def signalNext(self) -> bool:
-        item = self.subscribers.remove_first()
-        if item is None:
-            return False
-        ao = item.owner
-        ao.owner.signal()
-        return item.next is not None
+            item.owner.signal()
+            item = self.queue.remove_first()
 
     def close(self):
-        self.subscribers.clear()
+        self.signalAll()
+
+    def copyFrom(self, signaler:Signaler):
+        item = signaler.queue.remove_first()
+        while item is not None:
+            self.queue.add(item)
+            item = signaler.queue.remove_first()
+
+    def check(self, listener:Listener)->bool:
+        if listener is None: return False
+        if listener.queue.in_list(self.queue): return False
+        self.queue.add(listener.queue)
+        return True
+
+    def wait(self, listener:Listener):
+        self.check(listener)
+
+    def isQueued(self, listener:Listener)->bool:
+        return listener.queue.in_list(self.queue)
+
+    def hasListeners(self)->bool:
+        return self.queue.first is not None
 
 class Listener:
 
-    def __init__(self, owner:ActiveObject):
-        self.owner = owner
-        self.link = linked_list.DualLinkedListItem(self)
+    def __init__(self):
+        self.queue = linked_list.DualLinkedListItem(self)
 
-    def is_signaled(self) -> bool:
-        return not self.link.in_list()
+    def wait(self, signaler:Signaler):
+        signaler.check(self)
 
-    def wait(self, signaler: Signaler):
-        if self.link.list != signaler.subscribers:
-            signaler.subscribers.add(self.link)
+    def signal(self):
+        self.queue.remove()
 
-    def check(self, signaler: Signaler) -> bool:
-        if self.link.list == signaler.subscribers:
-            return False
-        else:
-            signaler.subscribers.add(self.link)
-            return True
+    def is_signaled(self)->bool:
+        return self.queue.list is None
+
+    def remove(self):
+        self.queue.remove()
 
     def close(self):
-        self.link.remove()
+        self.queue.remove()
+
+    def check(self, signaler:Signaler)->bool:
+        return signaler.check(self)
+
+class AOListener(Listener):
+
+    def __init__(self, owner:ActiveObject):
+        super().__init__()
+        self.owner = owner
+
+    def signal(self):
+        super().signal()
+        self.owner.signal()
+
+@DeprecationWarning
+class SignalPub:
+
+    def __init__(self, owner=None):
+        self.subscribers = linked_list.DualLinkedList()
+        self.owner = owner
+
+    def signal(self):
+        item = self.subscribers.first
+        while item is not None:
+            sub = item.owner
+            if not sub.edge or not sub.is_set:
+                sub.is_set = True
+                sub.owner.signal()
+            item = item.next
+
+    def close(self):
+        item = self.subscribers.remove_first()
+        while item is not None:
+            sub = item.owner
+            if not sub.edge or not sub.is_set:
+                sub.is_set = True
+                sub.owner.signal()
+            item = self.subscribers.remove_first()
+
+
+@DeprecationWarning
+class SignalSub:
+
+    def __init__(self, owner:ActiveObject, edge:bool=False, is_set=False, pub:SignalPub=None):
+        self.owner = owner
+        self.pub_link = linked_list.DualLinkedListItem(self)
+        self.is_set = is_set
+        self.edge = edge
+        if pub is not None: self.subscribe(pub)
+
+    def subscribe(self, pub:SignalPub):
+        pub.subscribers.add(self.pub_link)
+
+    def unsubscribe(self):
+        self.pub_link.remove()
+
+    def is_subscribed(self):
+        return self.pub_link.in_list()
+
+    def is_active(self):
+        if self.is_set: return True
+        if not self.pub_link.in_list(): return True
+        return False
+
+    def reset(self):
+        res = self.is_active()
+        self.is_set = False
+        return res
+
+    def close(self):
+        self.unsubscribe()
 
 class Flag:
 
@@ -274,14 +366,14 @@ def __comp_t__(n1, n2):
 class ActiveObjectsController():
 
     def __init__(self, priority_count:int=1):
-        self.__tree_by_t__ = avl_tree.Tree(__comp_t__)
-        self.__tree_by_id__ = avl_tree.Tree(__comp_id__)
-        self.__signaled__ = [linked_list.DualLinkedList() for i in range(0, priority_count)]
+        self._tree_by_t = avl_tree.Tree(__comp_t__)
+        self._tree_by_id = avl_tree.Tree(__comp_id__)
+        self._signaled = [linked_list.DualLinkedList() for i in range(0, priority_count)]
         self.terminated: bool = False
         self.emulated_time = None
 
     def find(self, type_name, id) -> ActiveObject:
-        node = self.__tree_by_id__.find((type_name,id), __compkey_id__)
+        node = self._tree_by_id.find((type_name,id), __compkey_id__)
         if node is not None:
             return node.owner
 
@@ -292,7 +384,7 @@ class ActiveObjectsController():
             return self.emulated_time
 
     def get_nearest(self) -> ActiveObject:
-        node = self.__tree_by_t__.get_leftmost()
+        node = self._tree_by_t.get_leftmost()
         if node is not None:
             return node.owner
 
@@ -316,7 +408,7 @@ class ActiveObjectsController():
                     on_error(obj, e)
 
         def remove_next_signaled() -> ActiveObject:
-            for queue in self.__signaled__:
+            for queue in self._signaled:
                 item = queue.remove_first()
                 if item is not None:
                     return item
@@ -351,26 +443,26 @@ class ActiveObjectsController():
 
     def for_each_object(self, type_name, func):
         if type_name is None:
-            n = self.__tree_by_id__.get_leftmost()
+            n = self._tree_by_id.get_leftmost()
             while n is not None:
                 func(n.owner)
                 n = n.get_successor()
         else:
-            n = self.__tree_by_id__.find_leftmost_eq(type_name, __compkey_type__)
+            n = self._tree_by_id.find_leftmost_eq(type_name, __compkey_type__)
             while n is not None and n.owner.type_name == type_name:
                 func(n.owner)
                 n = n.get_successor()
 
     def for_each_object_with_break(self, type_name, func):
         if type_name is None:
-            n = self.__tree_by_id__.get_leftmost()
+            n = self._tree_by_id.get_leftmost()
             while n is not None:
                 v = func(n.owner)
                 if v:
                     return v
                 n = n.get_successor()
         else:
-            n = self.__tree_by_id__.find_leftmost_eq(type_name, __compkey_type__)
+            n = self._tree_by_id.find_leftmost_eq(type_name, __compkey_type__)
             while n is not None and n.owner.type_name == type_name:
                 v = func(n.owner)
                 if v:
