@@ -1,4 +1,4 @@
-# This code is under MIT licence, you can find the complete file here: https://github.com/ivanovrvl/pg_tasks/blob/main/LICENSE
+# This code is under MIT licence, you can find the complete file here: https://github.com/ivanovrvl/py_active_objects/blob/main/LICENSE
 
 import avl_tree
 import linked_list
