@@ -15,7 +15,7 @@ class PrintAO(ActiveObject):
         self.id = id
         self.signal() # auto start
 
-    def process(self):
+    def _process(self):
 
         if self.reached(self.next_print):
             if self.flag.is_up(can_print):
@@ -32,7 +32,7 @@ class PublisherAO(ActiveObject):
         self.pub = SignalPub()
         self.signal() # auto start
 
-    def process(self):
+    def _process(self):
 
         # stop in 60 seconds
         if self.stop_time is None:

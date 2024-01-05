@@ -80,7 +80,7 @@ class Strike(ActiveObjectWithRetries):
                 self.__refresh_sub__()
         return self.sub_ref
 
-    def process(self):
+    def _process(self):
         pass
 
     def get_price(self):
@@ -109,7 +109,7 @@ class StrikeSubManager(ActiveObjectWithRetries):
         self.nosub_listener = Listener(self)
         self.signal()
 
-    def process(self):
+    def _process(self):
         if self.sub_listener.check(sub_queue_add_event):
             while True:
                 item = sub_queue.remove_first()
@@ -137,7 +137,7 @@ class SomeStrikeSubscriber(ActiveObjectWithRetries):
         self.strike = None
         self.signal()
 
-    def process(self):
+    def _process(self):
         if self.when_unsubscribe is None:
             # начало
             self.strike = Strike(self.controller)

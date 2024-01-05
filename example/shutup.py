@@ -16,7 +16,7 @@ class PrintAO(ActiveObject):
         self.signal() # auto start
         self.is_shutup = False
 
-    def process(self):
+    def _process(self):
         if self.is_shutup != shutup_ao.shutup:
             print(self.now(), 'Shutup', shutup_ao.shutup)
             self.is_shutup = shutup_ao.shutup
@@ -35,7 +35,7 @@ class ShutupAO(ActiveObject):
         self.shutup = True
         self.signal() # auto start
 
-    def process(self):
+    def _process(self):
 
         # stop in 60 seconds
         if self.stop_time is None:

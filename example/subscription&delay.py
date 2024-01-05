@@ -15,7 +15,7 @@ class PublisherAO(ActiveObject):
         self.event = Signaler()
         self.signal() # auto start
 
-    def process(self):
+    def _process(self):
 
         # stop in 60 seconds
         if self.stop_time is None:
@@ -44,7 +44,7 @@ class PrintAO(ActiveObject):
         self.id = id
         self.signal() # auto start
 
-    def process(self):
+    def _process(self):
         global next_print
         if self.listen.is_signaled(): # is print requested
             if self.reached(next_print): # is print allowed

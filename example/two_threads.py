@@ -14,7 +14,7 @@ class TestAO(ActiveObjectWithRetries):
         self.next2 = None
         self.signal() # auto start
 
-    def process(self):
+    def _process(self):
 
         # emulate error to check WithRetries
         # raise Exception("error")
