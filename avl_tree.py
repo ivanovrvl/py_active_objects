@@ -368,7 +368,7 @@ class  Tree:
     def find_or_add(self, node: TreeNode, Comp = None) -> TreeNode:
         Result = None
         if Comp is None: Comp = self.__comp
-        if __root is not None:
+        if self.__root is not None:
             InsertPos = self.__root
             while InsertPos is not None:
                 InsertComp = Comp(node, InsertPos)

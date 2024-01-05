@@ -6,23 +6,24 @@ from datetime import datetime, timedelta
 
 class ActiveObject:
 
-    def __init__(self, controller, type_name=None, id=None, priority:int=0):
+    type_id=None
+    priority:int=0
+
+    def __init__(self, controller, id=None):
         self.t:datetime = None
-        self.type_name = type_name
         self.id = id
         self.controller = controller
         self._tree_by_t = avl_tree.TreeNode(self)
         self._tree_by_id = avl_tree.TreeNode(self)
         self._signaled = linked_list.DualLinkedListItem(self)
-        self.priority = priority
         if id is not None:
             controller._tree_by_id.add(self._tree_by_id)
 
-    def process(self):
+    def _process(self):
         pass
 
-    def process_internal(self):
-        self.process()
+    def _process_internal(self):
+        self._process()
 
     def is_signaled(self) -> bool:
         return self._signaled.in_list()
@@ -49,7 +50,7 @@ class ActiveObject:
         return self.schedule_delay(timedelta(seconds=delay))
 
     def schedule_minutes(self, delay):
-        return self.schedule_delay(timedelta(minutes==delay))
+        return self.schedule_delay(timedelta(minutes=delay))
 
     def unschedule(self):
         self.controller._tree_by_t.remove(self._tree_by_t)
@@ -92,8 +93,8 @@ class ActiveObject:
 
 class ActiveObjectWithRetries(ActiveObject):
 
-    def __init__(self, controller, type_name=None, id=None, priority:int=0):
-        super().__init__(controller, type_name, id, priority)
+    def __init__(self, controller, id=None):
+        super().__init__(controller, id)
         self.__next_retry = None
         self.__next_retry_interval = None
         self.min_retry_interval = 1
@@ -102,11 +103,11 @@ class ActiveObjectWithRetries(ActiveObject):
     def was_error(self):
         return self.__next_retry is not None
 
-    def process_internal(self):
+    def _process_internal(self):
         try:
             if self.__next_retry is None \
             or self.reached(self.__next_retry):
-                super().process_internal()
+                super()._process_internal()
                 self.__next_retry = None
         except:
             if self.__next_retry is None:
@@ -333,9 +334,9 @@ class FlagListener:
             return False
 
 def _compkey_id(k, n):
-    if k[0] > n.owner.type_name:
+    if k[0] > n.owner.type_id:
         return 1
-    elif k[0] < n.owner.type_name:
+    elif k[0] < n.owner.type_id:
         return -1
     elif k[1] > n.owner.id:
         return 1
@@ -345,15 +346,15 @@ def _compkey_id(k, n):
         return -1
 
 def _compkey_type(k, n):
-    if k > n.owner.type_name:
+    if k > n.owner.type_id:
         return 1
-    elif k < n.owner.type_name:
+    elif k < n.owner.type_id:
         return -1
     else:
         return 0
 
 def _comp_id(n1, n2):
-    return _compkey_id((n1.owner.type_name, n1.owner.id), n2)
+    return _compkey_id((n1.owner.type_id, n1.owner.id), n2)
 
 def _comp_t(n1, n2):
     if n1.owner.t > n2.owner.t:
@@ -372,8 +373,8 @@ class ActiveObjectsController():
         self.terminated: bool = False
         self.emulated_time = None
 
-    def find(self, type_name, id) -> ActiveObject:
-        node = self._tree_by_id.find((type_name,id), _compkey_id)
+    def find(self, type_id, id) -> ActiveObject:
+        node = self._tree_by_id.find((type_id,id), _compkey_id)
         if node is not None:
             return node.owner
 
@@ -388,6 +389,9 @@ class ActiveObjectsController():
         if node is not None:
             return node.owner
 
+    def wakeup(self):
+        self.wakeup_event.set()
+
     def process(self, max_count: int=None, on_before=None, on_success=None, on_error=None) -> datetime:
 
         def do(obj:ActiveObject):
@@ -396,12 +400,12 @@ class ActiveObjectsController():
                 if on_before(obj):
                     return
             if on_error is None:
-                obj.process_internal()
+                obj._process_internal()
                 if on_success is not None:
                     on_success(obj)
             else:
                 try:
-                    obj.process_internal()
+                    obj._process_internal()
                     if on_success is not None:
                         on_success(obj)
                 except Exception as e:
@@ -441,20 +445,20 @@ class ActiveObjectsController():
                 if self.terminated: break
                 item = remove_next_signaled()
 
-    def for_each_object(self, type_name, func):
-        if type_name is None:
+    def for_each_object(self, type_id, func):
+        if type_id is None:
             n = self._tree_by_id.get_leftmost()
             while n is not None:
                 func(n.owner)
                 n = n.get_successor()
         else:
-            n = self._tree_by_id.find_leftmost_eq(type_name, _compkey_type)
-            while n is not None and n.owner.type_name == type_name:
+            n = self._tree_by_id.find_leftmost_eq(type_id, _compkey_type)
+            while n is not None and n.owner.type_id == type_id:
                 func(n.owner)
                 n = n.get_successor()
 
-    def for_each_object_with_break(self, type_name, func):
-        if type_name is None:
+    def for_each_object_with_break(self, type_id, func):
+        if type_id is None:
             n = self._tree_by_id.get_leftmost()
             while n is not None:
                 v = func(n.owner)
@@ -462,27 +466,50 @@ class ActiveObjectsController():
                     return v
                 n = n.get_successor()
         else:
-            n = self._tree_by_id.find_leftmost_eq(type_name, _compkey_type)
-            while n is not None and n.owner.type_name == type_name:
+            n = self._tree_by_id.find_leftmost_eq(type_id, _compkey_type)
+            while n is not None and n.owner.type_id == type_id:
                 v = func(n.owner)
                 if v:
                     return v
                 n = n.get_successor()
         return None
 
-    def get_ids(self, type_name) -> list:
+    def get_ids(self, type_id) -> list:
         res = list()
-        self.for_each_object(type_name, lambda o: res.append(o.id))
+        self.for_each_object(type_id, lambda o: res.append(o.id))
         return res
 
-    def signal(self, type_name=None):
-        self.for_each_object(type_name, lambda o: o.signal())
+    def signal(self, type_id=None):
+        self.for_each_object(type_id, lambda o: o.signal())
 
     def terminate(self):
         self.terminated = True
 
+
+async def async_loop(controller:ActiveObjectsController):
+    import asyncio
+    controller.terminated = False
+    controller.emulated_time = None
+    controller.wakeup_event = asyncio.Event()
+
+    while not controller.terminated:
+        next_time = controller.process()
+        if controller.terminated: return
+        if not controller.wakeup_event.is_set():
+            if next_time is not None:
+                delta = (next_time - controller.now()).total_seconds()
+                if delta > 0:
+                    done, pending = await asyncio.wait([asyncio.sleep(delta), controller.wakeup_event.wait()], return_when=asyncio.FIRST_COMPLETED)
+                    for p in pending:
+                        p.cancel()
+            else:
+                await controller.wakeup_event.wait()
+        controller.wakeup_event.clear()
+
+
 def simple_loop(controller:ActiveObjectsController):
     import time
+    controller.terminated = False
     controller.emulated_time = None
     while not controller.terminated:
         next_time = controller.process()
