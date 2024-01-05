@@ -19,11 +19,11 @@ class ActiveObject:
         if id is not None:
             controller._tree_by_id.add(self._tree_by_id)
 
-    def _process(self):
+    def process(self):
         pass
 
-    def _process_internal(self):
-        self._process()
+    def process_internal(self):
+        self.process()
 
     def is_signaled(self) -> bool:
         return self._signaled.in_list()
@@ -400,12 +400,12 @@ class ActiveObjectsController():
                 if on_before(obj):
                     return
             if on_error is None:
-                obj._process_internal()
+                obj.process_internal()
                 if on_success is not None:
                     on_success(obj)
             else:
                 try:
-                    obj._process_internal()
+                    obj.process_internal()
                     if on_success is not None:
                         on_success(obj)
                 except Exception as e:
