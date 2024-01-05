@@ -22,7 +22,7 @@ class ActiveObject:
     def process(self):
         pass
 
-    def process_internal(self):
+    def _process_internal(self):
         self.process()
 
     def is_signaled(self) -> bool:
@@ -400,12 +400,12 @@ class ActiveObjectsController():
                 if on_before(obj):
                     return
             if on_error is None:
-                obj.process_internal()
+                obj._process_internal()
                 if on_success is not None:
                     on_success(obj)
             else:
                 try:
-                    obj.process_internal()
+                    obj._process_internal()
                     if on_success is not None:
                         on_success(obj)
                 except Exception as e:
