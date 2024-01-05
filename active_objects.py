@@ -19,11 +19,11 @@ class ActiveObject:
         if id is not None:
             controller._tree_by_id.add(self._tree_by_id)
 
-    def process(self):
+    def _process(self):
         pass
 
     def _process_internal(self):
-        self.process()
+        self._process()
 
     def is_signaled(self) -> bool:
         return self._signaled.in_list()
