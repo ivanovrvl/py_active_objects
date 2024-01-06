@@ -16,8 +16,9 @@ class ActiveObject:
         self._tree_by_t = avl_tree.TreeNode(self)
         self._tree_by_id = avl_tree.TreeNode(self)
         self._signaled = linked_list.DualLinkedListItem(self)
-        if id is not None:
+        if id is not None and self.type_id is not None:
             controller._tree_by_id.add(self._tree_by_id)
+        self.signal()
 
     def _process(self):
         pass
@@ -38,18 +39,18 @@ class ActiveObject:
                 self.t = t
                 self.controller._tree_by_t.add(self._tree_by_t)
 
-    def schedule_delay(self, delay:timedelta):
+    def schedule_delay(self, delay:timedelta)->datetime:
         t = self.controller.now() + delay
         self.schedule(t)
         return t
 
-    def schedule_milliseconds(self, delay):
+    def schedule_milliseconds(self, delay)->datetime:
         return self.schedule_delay(timedelta(milliseconds=delay))
 
-    def schedule_seconds(self, delay):
+    def schedule_seconds(self, delay)->datetime:
         return self.schedule_delay(timedelta(seconds=delay))
 
-    def schedule_minutes(self, delay):
+    def schedule_minutes(self, delay)->datetime:
         return self.schedule_delay(timedelta(minutes=delay))
 
     def unschedule(self):
@@ -77,11 +78,6 @@ class ActiveObject:
 
     def get_t(self) -> datetime:
         return self.t
-
-    def next(self):
-        t = self._tree_by_t.get_successor()
-        if t is not None:
-            return t.owner
 
     def now(self):
         return self.controller.now()
@@ -390,7 +386,7 @@ class ActiveObjectsController():
             return node.owner
 
     def wakeup(self):
-        self.wakeup_event.set()
+        raise Exception("Not supported")
 
     def process(self, max_count: int=None, on_before=None, on_success=None, on_error=None) -> datetime:
 
@@ -424,8 +420,9 @@ class ActiveObjectsController():
                 dt = (obj.get_t() - self.now()).total_seconds()
                 if dt > 0:
                     next_time = obj.get_t()
-                    break
-                next_task = obj.next()
+                    break                
+                t = obj._tree_by_t.get_successor()
+                next_task = t.owner if t is not None else None
                 obj.unschedule()
                 obj.signal()
                 obj = next_task
@@ -485,26 +482,73 @@ class ActiveObjectsController():
     def terminate(self):
         self.terminated = True
 
+class AbstractTask(ActiveObject):
+
+    def __init__(self, controller, id=None):
+        super().__init__(controller, id)
+        self.exit_code = None
+        self._cancel_requested = False
+        self._kill_requested = False
+        self.error = None
+        self.completed_signal = Signaler()
+        self.signal()
+
+    def is_completed(self, listener:Listener=None)->bool:
+        if self.exit_code is not None:
+            return True
+        if listener is not None:
+            listener.wait(self.completed_signal)
+        return False
+
+    def is_cancelled(self)->bool:
+        return self._cancel_requested
+
+    def get_exit_code(self):
+        return self.exit_code
+
+    def _process(self):
+        if self.is_completed():
+            self.completed_signal.signalAll()
+            self.close()
+
+    def set_exit_code(self, exit_code:int):
+        if self.exit_code is None:
+            self.signal()
+            self.exit_code = exit_code
+
+    def cancel(self, kill:bool=False):
+        if not self._cancel_requested:
+            self._cancel_requested = True
+            self.signal()
+        if kill and not self._kill_requested:
+            self._kill_requested = True
+            self.signal()
+
+    def close(self):
+        self.completed_signal.close()
+        super().close()
 
 async def async_loop(controller:ActiveObjectsController):
     import asyncio
     controller.terminated = False
     controller.emulated_time = None
-    controller.wakeup_event = asyncio.Event()
+    controller._wakeup_event = asyncio.Event()
+    controller.wakeup = lambda: controller._wakeup_event.set()
 
     while not controller.terminated:
         next_time = controller.process()
         if controller.terminated: return
-        if not controller.wakeup_event.is_set():
+        if not controller._wakeup_event.is_set():
             if next_time is not None:
                 delta = (next_time - controller.now()).total_seconds()
                 if delta > 0:
-                    done, pending = await asyncio.wait([asyncio.sleep(delta), controller.wakeup_event.wait()], return_when=asyncio.FIRST_COMPLETED)
-                    for p in pending:
-                        p.cancel()
+                    try:
+                        await asyncio.wait_for(controller._wakeup_event.wait(), timeout=delta)
+                    except TimeoutError:
+                        pass
             else:
-                await controller.wakeup_event.wait()
-        controller.wakeup_event.clear()
+                await controller._wakeup_event.wait()
+        controller._wakeup_event.clear()
 
 
 def simple_loop(controller:ActiveObjectsController):
