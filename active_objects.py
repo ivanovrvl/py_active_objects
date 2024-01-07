@@ -416,7 +416,7 @@ class ActiveObjectsController():
         while not self.terminated:
             obj = self.get_nearest()
             next_time = None
-            while obj is not None:                
+            while obj is not None:
                 if obj.get_t() > self.now():
                     next_time = obj.get_t()
                     break                
@@ -450,24 +450,27 @@ class ActiveObjectsController():
         else:
             n = self._tree_by_id.find_leftmost_eq(type_id, _compkey_type)
             while n is not None and n.owner.type_id == type_id:
+                n2 = n.get_successor()
                 func(n.owner)
-                n = n.get_successor()
+                n = n2
 
     def for_each_object_with_break(self, type_id, func):
         if type_id is None:
             n = self._tree_by_id.get_leftmost()
             while n is not None:
+                n2 = n.get_successor()
                 v = func(n.owner)
                 if v:
                     return v
-                n = n.get_successor()
+                n = n2
         else:
             n = self._tree_by_id.find_leftmost_eq(type_id, _compkey_type)
             while n is not None and n.owner.type_id == type_id:
+                n2 = n.get_successor()
                 v = func(n.owner)
                 if v:
                     return v
-                n = n.get_successor()
+                n = n2
         return None
 
     def get_ids(self, type_id) -> list:
