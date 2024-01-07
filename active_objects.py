@@ -416,9 +416,8 @@ class ActiveObjectsController():
         while not self.terminated:
             obj = self.get_nearest()
             next_time = None
-            while obj is not None:
-                dt = (obj.get_t() - self.now()).total_seconds()
-                if dt > 0:
+            while obj is not None:                
+                if obj.get_t() > self.now():
                     next_time = obj.get_t()
                     break                
                 t = obj._tree_by_t.get_successor()
@@ -438,7 +437,7 @@ class ActiveObjectsController():
                 if max_count is not None:
                     max_count -= 1
                     if max_count <= 0:
-                        return None
+                        return self.now()
                 if self.terminated: break
                 item = remove_next_signaled()
 
