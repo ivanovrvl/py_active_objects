@@ -4,12 +4,15 @@ import avl_tree
 import linked_list
 from datetime import datetime, timedelta
 
+class ActiveObjectsController:
+    pass
+
 class ActiveObject:
 
     type_id=None
     priority:int=0
 
-    def __init__(self, controller, id=None):
+    def __init__(self, controller:ActiveObjectsController, id=None):
         self.t:datetime = None
         self.id = id
         self.controller = controller
@@ -65,6 +68,10 @@ class ActiveObject:
     def signal(self):
         if not self._signaled.in_list():
             self.controller._signaled[self.priority].add(self._signaled)
+    
+    def resignal(self):
+        self._signaled.remove()
+        self.controller._signaled[len(self.controller._signaled)-1].add(self._signaled)
 
     def reached(self, t:datetime) -> bool:
         if t is None:
@@ -368,6 +375,7 @@ class ActiveObjectsController():
         self._signaled = [linked_list.DualLinkedList() for i in range(0, priority_count)]
         self.terminated: bool = False
         self.emulated_time = None
+        self._async_tasks = []
 
     def find(self, type_id, id) -> ActiveObject:
         node = self._tree_by_id.find((type_id,id), _compkey_id)
@@ -386,7 +394,7 @@ class ActiveObjectsController():
             return node.owner
 
     def wakeup(self):
-        raise Exception("Not supported")
+        pass
 
     def process(self, max_count: int=None, on_before=None, on_success=None, on_error=None) -> datetime:
 
@@ -414,12 +422,20 @@ class ActiveObjectsController():
                     return item
 
         while not self.terminated:
+
+            while self._async_tasks:
+                try:
+                    func, params =self._async_tasks.pop()
+                    func(*params)
+                except Exception as e:
+                    print(str(e))
+
             obj = self.get_nearest()
             next_time = None
             while obj is not None:
                 if obj.get_t() > self.now():
                     next_time = obj.get_t()
-                    break                
+                    break
                 t = obj._tree_by_t.get_successor()
                 next_task = t.owner if t is not None else None
                 obj.unschedule()
@@ -483,6 +499,10 @@ class ActiveObjectsController():
 
     def terminate(self):
         self.terminated = True
+
+    def threadsafe_async_call(self, func, params):
+        self._async_tasks.append((func, params))
+        self.wakeup()
 
 class AbstractTask(ActiveObject):
 
